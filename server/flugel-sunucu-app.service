@@ -1,0 +1,30 @@
+[Unit]
+Description=FLUGEL Sunucu mobil API (yalniz loopback)
+After=network-online.target docker.service libvirtd.service
+Wants=network-online.target
+
+[Service]
+Type=simple
+User=root
+Group=root
+WorkingDirectory=/opt/flugel-sunucu-app
+ExecStart=/usr/bin/python3 /opt/flugel-sunucu-app/api.py
+Environment=FLUGEL_APP_HOST=127.0.0.1
+Environment=FLUGEL_APP_PORT=8818
+Environment=FLUGEL_APP_TOKEN_FILE=/etc/flugel-sunucu-app/token
+Environment=FLUGEL_APP_CONFIG=/etc/flugel-sunucu-app/config.json
+Environment=FLUGEL_APP_STATE_FILE=/home/flugel/sistem-bakim/durum/island.json
+Restart=on-failure
+RestartSec=5
+NoNewPrivileges=yes
+PrivateTmp=yes
+ProtectSystem=strict
+ProtectKernelTunables=yes
+ProtectKernelModules=yes
+ProtectControlGroups=yes
+RestrictSUIDSGID=yes
+LockPersonality=yes
+UMask=0077
+
+[Install]
+WantedBy=multi-user.target
