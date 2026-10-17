@@ -337,6 +337,7 @@ private fun NotificationsPage(data: JSONObject) {
                 Column(Modifier.padding(14.dp)) {
                     Text(row.optString("seviye", "-"), fontWeight = FontWeight.Bold)
                     Spacer(Modifier.height(4.dp))
+                    Text(row.optString("zaman", ""), color = MaterialTheme.colorScheme.onSurfaceVariant)
                     Text(row.optString("metin", ""))
                 }
             }

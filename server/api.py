@@ -14,15 +14,20 @@ import re
 import stat
 import subprocess
 import threading
+from collections import deque
+from datetime import datetime
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from pathlib import Path
+from urllib.error import HTTPError, URLError
 from urllib.parse import urlsplit
+from urllib.request import Request, urlopen
 
 
 NAME = re.compile(r"^[A-Za-z0-9_.-]{1,64}$")
 CONTAINER_ACTIONS = frozenset({"start", "stop", "restart"})
 VM_ACTIONS = frozenset({"start", "shutdown"})
 DESKTOP_UNITS = {"webtop": "flugel-webtop.service", "kasm": "flugel-kasm.service"}
+DESKTOP_SWITCH = "http://172.17.0.1:8104"
 MAX_JSON = 2_000_000
 
 
@@ -78,14 +83,47 @@ def command(args: list[str], timeout: int = 8) -> str:
     return result.stdout[:100_000]
 
 
+def notifications(path: Path) -> list[dict[str, str]]:
+    """Bildirim gunlugunun en son 80 satirini, en yeni once dondurur."""
+    with path.open(encoding="utf-8", errors="replace") as stream:
+        lines = deque(stream, maxlen=80)
+    items = []
+    for line in reversed(lines):
+        fields = line.rstrip("\n").split("|", 2)
+        if len(fields) != 3:
+            continue
+        zaman, seviye, metin = fields
+        try:
+            datetime.strptime(zaman, "%Y-%m-%d %H:%M:%S")
+        except ValueError:
+            continue
+        items.append({"zaman": zaman, "seviye": seviye[:32], "metin": metin.strip()[:1200]})
+    return items
+
+
+def start_desktop(name: str) -> None:
+    if name not in DESKTOP_UNITS:
+        raise ValueError("Bilinmeyen masaustu")
+    request = Request(f"{DESKTOP_SWITCH}/{name}", data=b"", method="POST")
+    with urlopen(request, timeout=25) as response:
+        if response.status != 202:
+            raise RuntimeError("Anahtar API basarisiz")
+        body = response.read(4096)
+    result = json.loads(body)
+    if not isinstance(result, dict) or result.get("baslatiliyor") != name:
+        raise RuntimeError("Anahtar API beklenmeyen yanit")
+
+
 class Server(ThreadingHTTPServer):
     daemon_threads = True
 
-    def __init__(self, address: tuple[str, int], token: str, config: dict, state_file: Path):
+    def __init__(self, address: tuple[str, int], token: str, config: dict, state_file: Path,
+                 notifications_file: Path):
         super().__init__(address, Handler)
         self.token = token
         self.config = config
         self.state_file = state_file
+        self.notifications_file = notifications_file
         self.action_lock = threading.Lock()
 
 
@@ -125,8 +163,7 @@ class Handler(BaseHTTPRequestHandler):
             if path == "/v1/status":
                 self.respond(200, read_json(self.server.state_file))
             elif path == "/v1/notifications":
-                state = read_json(self.server.state_file)
-                self.respond(200, {"items": state.get("bildirimler", [])[:80]})
+                self.respond(200, {"items": notifications(self.server.notifications_file)})
             elif path == "/v1/containers":
                 lines = command(["docker", "ps", "-a", "--format", "{{json .}}"])
                 items = []
@@ -170,7 +207,7 @@ class Handler(BaseHTTPRequestHandler):
         elif area == "vms" and name in self.server.config["vms"] and action in VM_ACTIONS:
             args = ["virsh", "-c", "qemu:///system", action, name]
         elif area == "desktops" and name in DESKTOP_UNITS and action == "start":
-            args = ["systemctl", "start", DESKTOP_UNITS[name]]
+            args = None
         else:
             self.respond(403, {"error": "Izin listesinde degil"})
             return
@@ -178,9 +215,12 @@ class Handler(BaseHTTPRequestHandler):
             self.respond(409, {"error": "Baska bir islem suruyor"})
             return
         try:
-            command(args, timeout=25)
+            if args is None:
+                start_desktop(name)
+            else:
+                command(args, timeout=25)
             self.respond(202, {"ok": True, "action": action, "name": name})
-        except (OSError, RuntimeError, subprocess.TimeoutExpired):
+        except (OSError, ValueError, RuntimeError, subprocess.TimeoutExpired, HTTPError, URLError):
             self.respond(503, {"error": "Islem tamamlanamadi"})
         finally:
             self.server.action_lock.release()
@@ -190,13 +230,15 @@ def main() -> None:
     token_path = Path(os.environ.get("FLUGEL_APP_TOKEN_FILE", "/etc/flugel-sunucu-app/token"))
     config_path = Path(os.environ.get("FLUGEL_APP_CONFIG", "/etc/flugel-sunucu-app/config.json"))
     state_path = Path(os.environ.get("FLUGEL_APP_STATE_FILE", "/home/flugel/sistem-bakim/durum/island.json"))
+    notifications_path = Path(os.environ.get("FLUGEL_APP_NOTIFICATIONS_FILE", "/home/flugel/sistem-bakim/durum/bildirimler.log"))
     host = os.environ.get("FLUGEL_APP_HOST", "127.0.0.1")
     if host not in {"127.0.0.1", "::1"}:
         raise ValueError("API yalniz loopback adresinde dinleyebilir")
     port = int(os.environ.get("FLUGEL_APP_PORT", "8818"))
     if not 1024 <= port <= 65535:
         raise ValueError("Port aralik disi")
-    server = Server((host, port), read_token(token_path), load_config(config_path), state_path)
+    server = Server((host, port), read_token(token_path), load_config(config_path), state_path,
+                    notifications_path)
     server.serve_forever(poll_interval=0.2)
 
 

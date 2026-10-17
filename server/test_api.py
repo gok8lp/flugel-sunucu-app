@@ -6,9 +6,9 @@ import unittest
 from pathlib import Path
 from urllib.error import HTTPError
 from urllib.request import Request, urlopen
-from unittest.mock import patch
+from unittest.mock import MagicMock, patch
 
-from api import Server, load_config, read_token
+from api import Server, load_config, read_token, start_desktop
 
 
 class ApiTest(unittest.TestCase):
@@ -16,9 +16,13 @@ class ApiTest(unittest.TestCase):
         self.tmp = tempfile.TemporaryDirectory()
         root = Path(self.tmp.name)
         self.state = root / "island.json"
-        self.state.write_text(json.dumps({"cpu": 42, "bildirimler": [{"metin": "test"}]}), encoding="utf-8")
+        self.state.write_text(json.dumps({"cpu": 42}), encoding="utf-8")
+        self.notifications = root / "bildirimler.log"
+        self.notifications.write_text("2026-10-17 21:00:00|BILGI|İlk\nbozuk satır\n"
+                                      "2026-10-17 21:01:00|UYARI|İkinci|ayrıntı\n", encoding="utf-8")
         self.server = Server(("127.0.0.1", 0), "x" * 32,
-                             {"containers": frozenset({"safe"}), "vms": frozenset({"W11"}), "links": []}, self.state)
+                             {"containers": frozenset({"safe"}), "vms": frozenset({"W11"}), "links": []},
+                             self.state, self.notifications)
         self.thread = threading.Thread(target=self.server.serve_forever, daemon=True)
         self.thread.start()
         self.base = f"http://127.0.0.1:{self.server.server_port}"
@@ -45,6 +49,23 @@ class ApiTest(unittest.TestCase):
         code, body = self.request("/v1/status")
         self.assertEqual((code, body["cpu"]), (200, 42))
 
+    def test_notifications_from_log_not_island_json(self):
+        code, body = self.request("/v1/notifications")
+        self.assertEqual(code, 200)
+        self.assertEqual(body["items"], [
+            {"zaman": "2026-10-17 21:01:00", "seviye": "UYARI", "metin": "İkinci|ayrıntı"},
+            {"zaman": "2026-10-17 21:00:00", "seviye": "BILGI", "metin": "İlk"},
+        ])
+
+    def test_notifications_only_last_80_lines(self):
+        older = "2026-10-17 20:00:00|BILGI|Eski\n" * 5
+        recent = "2026-10-17 21:00:00|BILGI|Yeni\n" * 80
+        self.notifications.write_text(older + recent, encoding="utf-8")
+        code, body = self.request("/v1/notifications")
+        self.assertEqual(code, 200)
+        self.assertEqual(len(body["items"]), 80)
+        self.assertTrue(all(item["metin"] == "Yeni" for item in body["items"]))
+
     def test_no_arbitrary_container_action(self):
         with patch("api.command") as execute:
             code, _ = self.request("/v1/containers/other/stop", method="POST")
@@ -69,14 +90,29 @@ class ApiTest(unittest.TestCase):
             execute.assert_not_called()
 
     def test_desktop_action_only_starts_fixed_unit(self):
-        with patch("api.command", return_value="") as execute:
+        with patch("api.start_desktop") as start:
             code, _ = self.request("/v1/desktops/webtop/start", method="POST")
             self.assertEqual(code, 202)
-            execute.assert_called_once_with(["systemctl", "start", "flugel-webtop.service"], timeout=25)
-        with patch("api.command") as execute:
+            start.assert_called_once_with("webtop")
+        with patch("api.start_desktop") as start:
             code, _ = self.request("/v1/desktops/webtop/stop", method="POST")
             self.assertEqual(code, 403)
-            execute.assert_not_called()
+            start.assert_not_called()
+
+    def test_desktop_switch_calls_fixed_internal_endpoint(self):
+        response = MagicMock()
+        response.status = 202
+        response.read.return_value = b'{"baslatiliyor":"kasm"}'
+        response.__enter__.return_value = response
+        with patch("api.urlopen", return_value=response) as open_url:
+            start_desktop("kasm")
+            request = open_url.call_args.args[0]
+            self.assertEqual(request.full_url, "http://172.17.0.1:8104/kasm")
+            self.assertEqual(request.get_method(), "POST")
+        with patch("api.urlopen") as open_url:
+            with self.assertRaises(ValueError):
+                start_desktop("other")
+            open_url.assert_not_called()
 
     def test_token_file_permissions(self):
         path = Path(self.tmp.name) / "token"

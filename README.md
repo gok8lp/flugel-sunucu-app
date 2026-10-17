@@ -14,12 +14,12 @@ Kotlin/Jetpack Compose/Material 3, sabit koyu tema. Özet, konteyner, VM, masaü
 
 ## Sunucu API — kurulum yalnız Claude tarafından
 
-`server/api.py` yalnız Python standart kütüphanesini kullanır ve varsayılan olarak `127.0.0.1:8818` üzerinde dinler. Telefonun erişebilmesi için Claude'un TLS sonlandıran, erişimi sınırlı bir proxy veya Tailscale yolu kurması gerekir. API'yi doğrudan dış ağa bağlamayın. Mevcut Island JSON verisini yerel durum dosyasından okur; herkese açık Akış uç noktasına yeni kontrol yetkisi eklemez.
+`server/api.py` yalnız Python standart kütüphanesini kullanır ve varsayılan olarak `127.0.0.1:8818` üzerinde dinler. Claude telefon erişimi için tailnet içi HTTPS `tailscale serve` kuracak; **Funnel ve herkese açık uç nokta yok**. Uygulamada varsayılan adres boş kalır, kullanıcı girer. API'yi doğrudan dış ağa bağlamayın. Mevcut Island JSON verisini yerel durum dosyasından, bildirimleri `bildirimler.log` dosyasının son 80 satırından okur; herkese açık Akış uç noktasına yeni kontrol yetkisi eklemez.
 
-1. `server/api.py` ve `server/flugel-sunucu-app.service` gözden geçirilir. Birim örneği root çalışır, çünkü Docker, libvirt ve iki systemd servisini kontrol eder; bu geniş yetkiyi dar izin listesi ve loopback/TLS katmanlarıyla sınırlamak kritiktir.
+1. `server/api.py` ve `server/flugel-sunucu-app.service` gözden geçirilir. Birim `flugel` kullanıcısı ve `docker`/`libvirt` ek gruplarıyla çalışır; bu gruplar (özellikle Docker soketi) geniş yetki verir, dolayısıyla Bearer token, erişim kısıtı, izin listesi ve tailnet TLS güvenlik incelemesi zorunludur. `ProtectSystem=strict` ve `ProtectHome=read-only` korunur.
 2. `/etc/flugel-sunucu-app/config.json` dosyası [config.example.json](server/config.example.json) şablonundan hazırlanır. `containers` ve `vms` listeleri varsayılan boş bırakılmıştır; yalnız gerçekten izin verilen adlar eklenir. `links` yalnız HTTPS URL kabul eder.
-3. Token dosyası `/etc/flugel-sunucu-app/token` için rastgele en az 32 ASCII karakter oluşturulur, mod `0600` ve root sahipliği verilir. Token depoya, komut satırı argümanına, loga veya ekran görüntüsüne konmaz; kullanıcı uygulamanın Ayarlar ekranına kendisi girer.
-4. Kod `/opt/flugel-sunucu-app/api.py` konumuna, systemd birimi uygun yere kopyalanır; servis etkinleştirmeden önce testler, izinler ve proxy politikası doğrulanır. API yolları: `GET /v1/status|containers|vms|desktops|links|notifications` ve izin listeli `POST /v1/containers/<ad>/start|stop|restart`, `/v1/vms/<ad>/start|shutdown`, `/v1/desktops/webtop|kasm/start`.
+3. Token dosyası `/etc/flugel-sunucu-app/token` için rastgele en az 32 ASCII karakter oluşturulur, mod `0600` ve `flugel` sahipliği verilir; yapılandırma ve Island/bildirim durum dosyalarının da bu kullanıcı tarafından okunabildiği doğrulanır. Token depoya, komut satırı argümanına, loga veya ekran görüntüsüne konmaz; kullanıcı uygulamanın Ayarlar ekranına kendisi girer.
+4. Kod `/opt/flugel-sunucu-app/api.py` konumuna, systemd birimi uygun yere kopyalanır; servis etkinleştirmeden önce testler, izinler ve tailnet-only `tailscale serve` politikası doğrulanır. Masaüstü başlatma mevcut anahtar API'ye `POST` yapar; karşılıklı `Conflicts` kuralı oradadır. Bu iç API'nin ayrıca kimlik doğrulaması yoktur ve Docker köprüsünden doğrudan erişimi güvenlik incelemesi ister. API yolları: `GET /v1/status|containers|vms|desktops|links|notifications` ve izin listeli `POST /v1/containers/<ad>/start|stop|restart`, `/v1/vms/<ad>/start|shutdown`, `/v1/desktops/webtop|kasm/start`.
 
 ## Test ve güvenlik notları
 
@@ -28,6 +28,6 @@ python3 -m unittest discover -s server -v
 python3 -m py_compile server/api.py server/test_api.py
 ```
 
-API, `Authorization: Bearer` tokenı sabit zamanlı karşılaştırır; token dosyası yalnız sahibi tarafından okunabilir olmalıdır. Komutlar sabit argüman listesiyle ve zaman aşımıyla çalışır; shell kullanılmaz. İşlem sırasında tek bir eylem yürütülür, başarı veya genel hata döner; ham komut hata çıktısı ve token loglanmaz. Proxy katmanında ayrıca TLS, yetkili cihaz erişimi, hız sınırı ve log/denetim politikası gerekir. Mevcut `flugel-webtop`/`flugel-kasm` karşılıklı dışlama kuralları serviste kalır; API yalnız `systemctl start` çağırır.
+API, `Authorization: Bearer` tokenı sabit zamanlı karşılaştırır; token dosyası yalnız sahibi tarafından okunabilir olmalıdır. Docker/libvirt komutları sabit argüman listesiyle ve zaman aşımıyla çalışır; shell kullanılmaz. İşlem sırasında tek bir eylem yürütülür, başarı veya genel hata döner; ham komut hata çıktısı ve token loglanmaz. Tailscale Serve katmanında ayrıca tailnet cihaz erişimi, hız sınırı ve log/denetim politikası gözden geçirilmelidir. Mevcut `flugel-webtop`/`flugel-kasm` karşılıklı dışlama kuralları serviste kalır; API masaüstü için yalnız anahtar API'ye POST çağırır.
 
 Bu proje henüz yayımlanmadı. APK kurulumu veya API dağıtımı için sunucu ve telefon üzerinde ayrıca güvenlik incelemesi gerekir.

@@ -5,8 +5,9 @@ Wants=network-online.target
 
 [Service]
 Type=simple
-User=root
-Group=root
+User=flugel
+Group=flugel
+SupplementaryGroups=docker libvirt
 WorkingDirectory=/opt/flugel-sunucu-app
 ExecStart=/usr/bin/python3 /opt/flugel-sunucu-app/api.py
 Environment=FLUGEL_APP_HOST=127.0.0.1
@@ -14,11 +15,13 @@ Environment=FLUGEL_APP_PORT=8818
 Environment=FLUGEL_APP_TOKEN_FILE=/etc/flugel-sunucu-app/token
 Environment=FLUGEL_APP_CONFIG=/etc/flugel-sunucu-app/config.json
 Environment=FLUGEL_APP_STATE_FILE=/home/flugel/sistem-bakim/durum/island.json
+Environment=FLUGEL_APP_NOTIFICATIONS_FILE=/home/flugel/sistem-bakim/durum/bildirimler.log
 Restart=on-failure
 RestartSec=5
 NoNewPrivileges=yes
 PrivateTmp=yes
 ProtectSystem=strict
+ProtectHome=read-only
 ProtectKernelTunables=yes
 ProtectKernelModules=yes
 ProtectControlGroups=yes
