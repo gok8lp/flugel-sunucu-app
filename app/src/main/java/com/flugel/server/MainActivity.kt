@@ -87,6 +87,7 @@ private fun Dashboard(store: SecureStore) {
     var pending by remember { mutableStateOf<PendingAction?>(null) }
     val connectionError = stringResource(R.string.connection_error)
     val actionOk = stringResource(R.string.action_ok)
+    val saved = stringResource(R.string.saved)
     val titles = listOf(R.string.summary, R.string.containers, R.string.vms, R.string.desktops,
         R.string.services, R.string.notifications, R.string.settings)
     val paths = listOf("/v1/status", "/v1/containers", "/v1/vms", "/v1/desktops",
@@ -123,7 +124,7 @@ private fun Dashboard(store: SecureStore) {
             SettingsPage(store, base) { newBase, hasToken ->
                 base = newBase
                 tokenPresent = hasToken
-                message = context.getString(R.string.saved)
+                message = saved
             }
         } else if (base.isBlank() || !tokenPresent) {
             Text(stringResource(R.string.configure_first), Modifier.padding(20.dp))

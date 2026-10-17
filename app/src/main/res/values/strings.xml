@@ -15,7 +15,7 @@
     <string name="save">Kaydet</string>
     <string name="saved">Kaydedildi</string>
     <string name="url_error">Yalnız geçerli HTTPS adresi kullan.</string>
-    <string name="connection_error">Sunucuya bağlanılamadı. Adres, TLS ve erişimi kontrol et.</string>
+    <string name="connection_error">Sunucuya bağlanılamadı. HTTPS, TLS ve erişimi kontrol et.</string>
     <string name="start">Başlat</string>
     <string name="stop">Durdur</string>
     <string name="restart">Yeniden başlat</string>
@@ -24,7 +24,6 @@
     <string name="cancel">Vazgeç</string>
     <string name="confirm">Onayla</string>
     <string name="action_ok">İşlem istendi; durumu yenile.</string>
-    <string name="not_allowed">Bu işlem sunucu izin listesinde yok.</string>
     <string name="no_items">Gösterilecek kayıt yok.</string>
     <string name="cpu">CPU</string>
     <string name="memory">Bellek</string>
@@ -37,5 +36,4 @@
     <string name="active">Açık</string>
     <string name="inactive">Kapalı</string>
     <string name="open_link">Aç</string>
-    <string name="updated_at">Güncelleme: %1$s</string>
 </resources>

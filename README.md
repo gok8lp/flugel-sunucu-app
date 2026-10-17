@@ -2,15 +2,15 @@
 
 Kotlin/Jetpack Compose/Material 3, sabit koyu tema. Özet, konteyner, VM, masaüstü, HTTPS servis linkleri, bildirimler ve bağlantı ayarları ekranları bulunur. Uygulama adresi/tokenı koda gömülmez. Docker `destroy/rm/prune`, VM `destroy`, zorla kapatma ve serbest komut çalıştırma yoktur.
 
-**Durum:** Kaynak ve API testleri hazır; yerel makinede Android SDK/Gradle kurulu olmadığından APK burada derlenmedi. GitHub Actions yapılandırması vardır ama bu depo GitHub'a gönderilmedi; CI çalıştırılmadı. Sunucu API'si kurulmadı, token oluşturulmadı, ağ/tünel değiştirilmedi. Claude kodu gözden geçirip dağıtımı ve yayını kullanıcı onayıyla yapacak.
+**Durum:** Android test APK'si yerelde derlendi; Android Lint ve Python API testleri geçti. İlk dağıtım yalnız telefon üzerinde deneme içindir; cihaz testi henüz yapılmadı. Sunucu API'si kurulmadı, token oluşturulmadı, ağ/tünel değiştirilmedi. Dolayısıyla uygulama açılır fakat Ayarlar'a canlı HTTPS adresi ve token girilene kadar sunucu verisi göstermez.
 
 ## Android
 
 - `app/`: yedi ekrana sahip Compose uygulaması. Sunucu URL'si HTTPS olmak zorunda; yönlendirme takip edilmez, sertifika doğrulaması Android'in varsayılan TLS denetimidir. Kontrol komutları onay diyaloğundan geçer. VM için sadece `start` ve ACPI `shutdown` görünür.
 - Token Android Keystore AES-GCM ile saklanır, yedekleme kapalıdır. Resmî Android belgelerinde `EncryptedSharedPreferences` kullanımdan kaldırıldığı için yeni projede doğrudan Keystore kullanıldı. Telefon değişirse token tekrar girilir.
 - Android Gradle Plugin 9.4'ün yerleşik Kotlin desteği kullanılır; ayrıca `kotlin-android` eklentisi uygulanmaz. Compose derleyici eklentisi AGP'nin varsayılan Kotlin 2.2.10 sürümüyle eşlidir.
-- Yapılandırılmış Android SDK/JDK 17/Gradle 9.6 ile `gradle :app:assembleDebug` veya Android Studio'da Build çalıştırılır. Standart Gradle Wrapper henüz üretilmedi; `./gradlew` şu aşamada yoktur. APK çıktısı `app/build/outputs/apk/debug/` altında oluşur.
-- `v*` etiketi gönderildiğinde CI debug APK ve **imzasız** release APK üretip GitHub Release oluşturacak şekilde hazırlanmıştır. Dağıtım öncesi imza ve cihaz testi zorunludur; etiketi yalnız kullanıcı kararıyla gönderin.
+- Android SDK platform 37.0, Build Tools 37.0.0, JDK 21 ve Gradle 9.6 ile `gradle :app:assembleDebug :app:lintDebug` çalıştırılır. `targetSdk` hâlâ 36'dır; 37 yalnız güncel Compose bağımlılıklarını derlemek için kullanılır. Gradle Wrapper henüz üretilmedi; `./gradlew` şu aşamada yoktur. APK çıktısı `app/build/outputs/apk/debug/` altında oluşur.
+- GitHub Actions yalnız test APK'sini derler ve artifact olarak yükler; otomatik GitHub Release veya imzasız production APK yayımlamaz. Deneme sürümü Android'in debug anahtarıyla imzalıdır. Üretim sürümü için kalıcı özel imzalama anahtarı, güvenli saklama ve gerçek cihaz testi gerekir. İleride farklı anahtarla imzalanan uygulamaya geçerken mevcut debug uygulamasını kaldırmak gerekebilir; bu işlem yerel ayarları siler.
 
 ## Sunucu API — kurulum yalnız Claude tarafından
 
@@ -30,4 +30,4 @@ python3 -m py_compile server/api.py server/test_api.py
 
 API, `Authorization: Bearer` tokenı sabit zamanlı karşılaştırır; token dosyası yalnız sahibi tarafından okunabilir olmalıdır. Docker/libvirt komutları sabit argüman listesiyle ve zaman aşımıyla çalışır; shell kullanılmaz. İşlem sırasında tek bir eylem yürütülür, başarı veya genel hata döner; ham komut hata çıktısı ve token loglanmaz. Tailscale Serve katmanında ayrıca tailnet cihaz erişimi, hız sınırı ve log/denetim politikası gözden geçirilmelidir. Mevcut `flugel-webtop`/`flugel-kasm` karşılıklı dışlama kuralları serviste kalır; API masaüstü için yalnız anahtar API'ye POST çağırır.
 
-Bu proje henüz yayımlanmadı. APK kurulumu veya API dağıtımı için sunucu ve telefon üzerinde ayrıca güvenlik incelemesi gerekir.
+APK'nin dağıtılması sunucu API'sini dağıtmaz. Telefon işlevlerini uçtan uca kullanmak için sunucu API'si, tailnet HTTPS ve erişim sınırlarının ayrıca güvenlik incelemesinden geçirilip kurulması gerekir. Deneme APK'sini yalnız bu deponun GitHub Release sayfasından indir; üçüncü taraf kopyalara güvenme.

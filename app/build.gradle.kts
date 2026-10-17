@@ -5,7 +5,7 @@ plugins {
 
 android {
     namespace = "com.flugel.server"
-    compileSdk = 36
+    compileSdk = 37
 
     defaultConfig {
         applicationId = "com.flugel.server"

@@ -24,7 +24,6 @@
     <string name="cancel">Cancel</string>
     <string name="confirm">Confirm</string>
     <string name="action_ok">Action requested; refresh the status.</string>
-    <string name="not_allowed">This action is not on the server allowlist.</string>
     <string name="no_items">No records to show.</string>
     <string name="cpu">CPU</string>
     <string name="memory">Memory</string>
@@ -37,5 +36,4 @@
     <string name="active">Active</string>
     <string name="inactive">Inactive</string>
     <string name="open_link">Open</string>
-    <string name="updated_at">Updated: %1$s</string>
 </resources>
