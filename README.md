@@ -12,6 +12,10 @@ Kotlin/Jetpack Compose/Material 3, sabit koyu tema. Özet, konteyner, VM, masaü
 - Android SDK platform 37.0, Build Tools 37.0.0, JDK 21 ve Gradle 9.6 ile `gradle :app:assembleDebug :app:lintDebug` çalıştırılır. `targetSdk` hâlâ 36'dır; 37 yalnız güncel Compose bağımlılıklarını derlemek için kullanılır. Gradle Wrapper henüz üretilmedi; `./gradlew` şu aşamada yoktur. APK çıktısı `app/build/outputs/apk/debug/` altında oluşur.
 - GitHub Actions yalnız test APK'sini derler ve artifact olarak yükler; otomatik GitHub Release veya imzasız production APK yayımlamaz. Deneme sürümü Android'in debug anahtarıyla imzalıdır. Üretim sürümü için kalıcı özel imzalama anahtarı, güvenli saklama ve gerçek cihaz testi gerekir. İleride farklı anahtarla imzalanan uygulamaya geçerken mevcut debug uygulamasını kaldırmak gerekebilir; bu işlem yerel ayarları siler.
 
+## Telefonda ilk deneme
+
+GitHub [Releases](https://github.com/gok8lp/flugel-sunucu-app/releases) sayfasındaki ön sürümün `flugel-sunucu-v0.1.0-test.apk` dosyasını indir. Android kurulum izni isterse yalnız indirmeyi yaptığın uygulama için geçici olarak izin ver; kurulumdan sonra kapat. Uygulamayı açıp yedi sekmenin ve Ayarlar ekranının göründüğünü denetle. Sunucu API'si henüz canlıya alınmadığı için sunucu adresi/token olmadan veriler yüklenmeyecek; bu beklenen durumdur. Hata görürsen telefonun Android sürümünü ve ekran görüntüsünü ilet, token veya özel ağ adresini paylaşma.
+
 ## Sunucu API — kurulum yalnız Claude tarafından
 
 `server/api.py` yalnız Python standart kütüphanesini kullanır ve varsayılan olarak `127.0.0.1:8818` üzerinde dinler. Claude telefon erişimi için tailnet içi HTTPS `tailscale serve` kuracak; **Funnel ve herkese açık uç nokta yok**. Uygulamada varsayılan adres boş kalır, kullanıcı girer. API'yi doğrudan dış ağa bağlamayın. Mevcut Island JSON verisini yerel durum dosyasından, bildirimleri `bildirimler.log` dosyasının son 80 satırından okur; herkese açık Akış uç noktasına yeni kontrol yetkisi eklemez.
