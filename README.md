@@ -1,37 +1,54 @@
-# FLUGEL Sunucu — Android uygulaması ve yerel kontrol API'si
+# Home Server Android
 
-Kotlin/Jetpack Compose/Material 3, sabit koyu tema. Özet, konteyner, VM, masaüstü, HTTPS servis linkleri, bildirimler ve bağlantı ayarları ekranları bulunur. Uygulama adresi/tokenı koda gömülmez. Docker `destroy/rm/prune`, VM `destroy`, zorla kapatma ve serbest komut çalıştırma yoktur.
+Kişisel ev sunucusu için Kotlin/Jetpack Compose Android istemcisi ve Python kontrol API'si prototipi.
+Android dashboard and a local Python API for a personal home server.
 
-**Durum:** Android test APK'si yerelde derlendi; Android Lint ve Python API testleri geçti. İlk dağıtım yalnız telefon üzerinde deneme içindir; cihaz testi henüz yapılmadı. Sunucu API'si kurulmadı, token oluşturulmadı, ağ/tünel değiştirilmedi. Dolayısıyla uygulama açılır fakat Ayarlar'a canlı HTTPS adresi ve token girilene kadar sunucu verisi göstermez.
+## Ne var?
 
-## Android
+- Sunucu özeti, Docker konteynerleri, sanal makineler, masaüstleri, servis bağlantıları ve bildirim ekranları.
+- HTTPS adresi ve erişim tokenı kullanıcı tarafından girilir; kimlik bilgileri kaynakta hazır değildir.
+- Android Keystore ile yerel token saklama.
+- Python standart kütüphanesiyle API ve izin listesine bağlı start/stop işlemleri.
 
-- `app/`: yedi ekrana sahip Compose uygulaması. Sunucu URL'si HTTPS olmak zorunda; yönlendirme takip edilmez, sertifika doğrulaması Android'in varsayılan TLS denetimidir. Kontrol komutları onay diyaloğundan geçer. VM için sadece `start` ve ACPI `shutdown` görünür.
-- Token Android Keystore AES-GCM ile saklanır, yedekleme kapalıdır. Resmî Android belgelerinde `EncryptedSharedPreferences` kullanımdan kaldırıldığı için yeni projede doğrudan Keystore kullanıldı. Telefon değişirse token tekrar girilir.
-- Android Gradle Plugin 9.4'ün yerleşik Kotlin desteği kullanılır; ayrıca `kotlin-android` eklentisi uygulanmaz. Compose derleyici eklentisi AGP'nin varsayılan Kotlin 2.2.10 sürümüyle eşlidir.
-- Android SDK platform 37.0, Build Tools 37.0.0, JDK 21 ve Gradle 9.6 ile `gradle :app:assembleDebug :app:lintDebug` çalıştırılır. `targetSdk` hâlâ 36'dır; 37 yalnız güncel Compose bağımlılıklarını derlemek için kullanılır. Gradle Wrapper henüz üretilmedi; `./gradlew` şu aşamada yoktur. APK çıktısı `app/build/outputs/apk/debug/` altında oluşur.
-- GitHub Actions yalnız test APK'sini derler ve artifact olarak yükler; otomatik GitHub Release veya imzasız production APK yayımlamaz. Deneme sürümü Android'in debug anahtarıyla imzalıdır. Üretim sürümü için kalıcı özel imzalama anahtarı, güvenli saklama ve gerçek cihaz testi gerekir. İleride farklı anahtarla imzalanan uygulamaya geçerken mevcut debug uygulamasını kaldırmak gerekebilir; bu işlem yerel ayarları siler.
+Bu uygulama genel amaçlı SSH istemcisi değildir. API kurulmadan uygulama sunucu verisi göstermez.
+Test APK'sinin bulunması fiziksel cihazda bütün işlevlerin doğrulandığı anlamına gelmez.
 
-## Telefonda ilk deneme
+## Dizinler
 
-GitHub [Releases](https://github.com/gok8lp/flugel-sunucu-app/releases) sayfasındaki ön sürümün `flugel-sunucu-v0.1.0-test.apk` dosyasını indir. Android kurulum izni isterse yalnız indirmeyi yaptığın uygulama için geçici olarak izin ver; kurulumdan sonra kapat. Uygulamayı açıp yedi sekmenin ve Ayarlar ekranının göründüğünü denetle. Sunucu API'si henüz canlıya alınmadığı için sunucu adresi/token olmadan veriler yüklenmeyecek; bu beklenen durumdur. Hata görürsen telefonun Android sürümünü ve ekran görüntüsünü ilet, token veya özel ağ adresini paylaşma.
+| Dizin | İçerik |
+| --- | --- |
+| `app/` | Android ekranları, istemci ve yerel güvenli saklama |
+| `server/api.py` | Yerel HTTP API |
+| `server/config.example.json` | İzin verilen konteyner/VM listeleri için örnek |
+| `server/test_api.py` | API testleri |
+| `.github/workflows/android.yml` | Debug APK ve lint iş akışı |
 
-## Sunucu API — kurulum yalnız Claude tarafından
+## Android derlemesi
 
-`server/api.py` yalnız Python standart kütüphanesini kullanır ve varsayılan olarak `127.0.0.1:8818` üzerinde dinler. Claude telefon erişimi için tailnet içi HTTPS `tailscale serve` kuracak; **Funnel ve herkese açık uç nokta yok**. Uygulamada varsayılan adres boş kalır, kullanıcı girer. API'yi doğrudan dış ağa bağlamayın. Mevcut Island JSON verisini yerel durum dosyasından, bildirimleri `bildirimler.log` dosyasının son 80 satırından okur; herkese açık Akış uç noktasına yeni kontrol yetkisi eklemez.
+Projede Gradle Wrapper yoktur; sistemde uygun Gradle ve Android SDK kurulmalıdır.
+CI yapılandırması Gradle 9.6.0, Android 37.0 platform/build tools ve Java kullanır;
+kesin ayarlar build dosyalarında ve workflow içinde görülebilir.
 
-1. `server/api.py` ve `server/flugel-sunucu-app.service` gözden geçirilir. Birim `flugel` kullanıcısı ve `docker`/`libvirt` ek gruplarıyla çalışır; bu gruplar (özellikle Docker soketi) geniş yetki verir, dolayısıyla Bearer token, erişim kısıtı, izin listesi ve tailnet TLS güvenlik incelemesi zorunludur. `ProtectSystem=strict` ve `ProtectHome=read-only` korunur.
-2. `/etc/flugel-sunucu-app/config.json` dosyası [config.example.json](server/config.example.json) şablonundan hazırlanır. `containers` ve `vms` listeleri varsayılan boş bırakılmıştır; yalnız gerçekten izin verilen adlar eklenir. `links` yalnız HTTPS URL kabul eder.
-3. Token dosyası `/etc/flugel-sunucu-app/token` için rastgele en az 32 ASCII karakter oluşturulur, mod `0600` ve `flugel` sahipliği verilir; yapılandırma ve Island/bildirim durum dosyalarının da bu kullanıcı tarafından okunabildiği doğrulanır. Token depoya, komut satırı argümanına, loga veya ekran görüntüsüne konmaz; kullanıcı uygulamanın Ayarlar ekranına kendisi girer.
-4. Kod `/opt/flugel-sunucu-app/api.py` konumuna, systemd birimi uygun yere kopyalanır; servis etkinleştirmeden önce testler, izinler ve tailnet-only `tailscale serve` politikası doğrulanır. Masaüstü başlatma mevcut anahtar API'ye `POST` yapar; karşılıklı `Conflicts` kuralı oradadır. Bu iç API'nin ayrıca kimlik doğrulaması yoktur ve Docker köprüsünden doğrudan erişimi güvenlik incelemesi ister. API yolları: `GET /v1/status|containers|vms|desktops|links|notifications` ve izin listeli `POST /v1/containers/<ad>/start|stop|restart`, `/v1/vms/<ad>/start|shutdown`, `/v1/desktops/webtop|kasm/start`.
+```bash
+gradle :app:assembleDebug :app:lintDebug
+```
 
-## Test ve güvenlik notları
+APK: `app/build/outputs/apk/debug/`. Hazır test paketleri varsa [Releases](https://github.com/gok8lp/home-server-android/releases) sayfasındadır.
+Bu belgeler güncellendiğinde eski APK'lerin görünen adı otomatik değişmez.
+
+## API'yi önce test et
 
 ```bash
 python3 -m unittest discover -s server -v
-python3 -m py_compile server/api.py server/test_api.py
 ```
 
-API, `Authorization: Bearer` tokenı sabit zamanlı karşılaştırır; token dosyası yalnız sahibi tarafından okunabilir olmalıdır. Docker/libvirt komutları sabit argüman listesiyle ve zaman aşımıyla çalışır; shell kullanılmaz. İşlem sırasında tek bir eylem yürütülür, başarı veya genel hata döner; ham komut hata çıktısı ve token loglanmaz. Tailscale Serve katmanında ayrıca tailnet cihaz erişimi, hız sınırı ve log/denetim politikası gözden geçirilmelidir. Mevcut `flugel-webtop`/`flugel-kasm` karşılıklı dışlama kuralları serviste kalır; API masaüstü için yalnız anahtar API'ye POST çağırır.
+Kurulumdan önce `server/config.example.json`, `server/api.py` ve systemd birimini incele.
+API varsayılan `127.0.0.1:8818` üzerinde çalışır; Android erişimi için yetkilendirilmiş HTTPS katmanı gerekir.
+Konteyner/VM izin listelerini kendi ortamına göre doldur; API'yi kimlik doğrulamasız internete açma.
+Docker/libvirt yetkileri ve token dosyası izinleri kurulumun parçasıdır. Bu depo değişikliği sunucuda kurulum yapmaz.
 
-APK'nin dağıtılması sunucu API'sini dağıtmaz. Telefon işlevlerini uçtan uca kullanmak için sunucu API'si, tailnet HTTPS ve erişim sınırlarının ayrıca güvenlik incelemesinden geçirilip kurulması gerekir. Deneme APK'sini yalnız bu deponun GitHub Release sayfasından indir; üçüncü taraf kopyalara güvenme.
+## İlgili projeler ve eski teknik adlar
+
+[home-server](https://github.com/gok8lp/home-server): altyapı örnekleri.
+[desktop-server-toolkit](https://github.com/gok8lp/desktop-server-toolkit): masaüstü ve veri yardımcıları.
+Android paket kimliği, servis dosyası ve yapılandırma yolları mevcut kurulumlarla uyumluluk için korunur.
